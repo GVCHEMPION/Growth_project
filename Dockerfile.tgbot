@@ -1,0 +1,33 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Установка системных зависимостей
+RUN apt-get update && apt-get install -y \
+    curl \
+    gcc \
+    g++ \
+    build-essential \
+    libffi-dev \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Копирование requirements.txt
+COPY tg_requir.txt .
+
+# Установка Python зависимостей
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r tg_requir.txt
+
+# Копирование файлов бота
+COPY tg_bot.py .
+
+# Создание директории для сессий Telegram
+RUN mkdir -p /app/sessions
+
+# Установка переменных окружения
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONIOENCODING=utf-8
+
+# Команда запуска
+CMD ["python", "tg_bot.py"]

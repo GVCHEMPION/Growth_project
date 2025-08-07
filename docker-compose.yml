@@ -1,0 +1,155 @@
+services:
+  kafka:
+    image: bitnami/kafka:latest
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9094
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9094
+      - KAFKA_KRAFT_CLUSTER_ID=oi18qunaSj2pFg40ytiFKg
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_CFG_NUM_PARTITIONS=3
+      - KAFKA_CFG_DEFAULT_REPLICATION_FACTOR=1
+    networks:
+      - app-network
+    volumes:
+      - kafka_data:/bitnami/kafka
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/bitnami/kafka/bin/kafka-topics.sh --list --bootstrap-server localhost:9092 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  redis:
+    image: redis/redis-stack:latest
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+    command: redis-server --appendonly yes --loadmodule /opt/redis-stack/lib/redisearch.so --protected-mode no
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/11434' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 8
+      start_period: 120s
+      
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "8000:8000"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_URL=http://ollama:11434
+      - PYTHONUNBUFFERED=1
+      - PYTHONIOENCODING=utf-8
+    env_file:
+      - .env
+    networks:
+      - app-network
+    volumes:
+      - ./models.py:/app/models.py
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+  microservice:
+    build:
+      context: .
+      dockerfile: Dockerfile.microservice
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_URL=http://ollama:11434
+      - PYTHONUNBUFFERED=1
+      - PYTHONIOENCODING=utf-8
+    env_file:
+      - .env
+    networks:
+      - app-network
+    volumes:
+      - ./models.py:/app/models.py
+      - ./messages_schema.yaml:/app/messages_schema.yaml
+      - ./topics_schema.yaml:/app/topics_schema.yaml
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+  tg-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.tgbot
+    environment:
+      - CHAT_SERVER_URL=http://server:8000
+      - PYTHONUNBUFFERED=1
+      - PYTHONIOENCODING=utf-8
+    env_file:
+      - .env
+    networks:
+      - app-network
+    volumes:
+      - ./models.py:/app/models.py
+      - ./tg_sessions:/app/sessions
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  kafka_data:
+  redis_data:
+  ollama_data:

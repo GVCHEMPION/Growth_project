@@ -1,0 +1,32 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Установка системных зависимостей
+RUN apt-get update && apt-get install -y \
+    curl \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Копирование requirements.txt
+COPY requirements.txt .
+
+# Установка Python зависимостей
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Копирование основного файла
+COPY server.py .
+
+# Создание директории для shared файлов
+RUN mkdir -p /app
+
+# Настройка переменных окружения для правильной работы логов
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONIOENCODING=utf-8
+
+# Expose port
+EXPOSE 8000
+
+# Команда запуска с правильными параметрами логирования
+CMD ["python", "server.py"]
