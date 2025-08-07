@@ -1,0 +1,39 @@
+version: '0.1.0'
+
+index:
+  name: messages_index
+  prefix: message
+
+fields:
+  - name: request_id
+    type: tag
+
+  - name: message_id
+    type: text
+      
+  - name: topic_id
+    type: tag
+      
+  - name: sender
+    type: text
+      
+  - name: timestamp
+    type: numeric
+      
+  - name: message_text
+    type: text
+      
+  - name: text_index
+    type: numeric
+      
+  - name: message_embedding
+    type: vector
+    attrs:
+      dims: 1024
+      distance_metric: cosine
+      algorithm: hnsw
+      datatype: float32
+      initial_cap: 10000
+      m: 16
+      ef_construction: 200
+      ef_runtime: 10

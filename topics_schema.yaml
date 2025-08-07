@@ -1,0 +1,33 @@
+version: '0.1.0'
+
+index:
+  name: topics_index
+  prefix: topic
+
+fields:
+  - name: request_id
+    type: tag
+
+  - name: topic_id
+    type: tag
+      
+  - name: topic_name
+    type: text
+      
+  - name: summary
+    type: text
+      
+  - name: message_count
+    type: numeric
+      
+  - name: topic_embedding
+    type: vector
+    attrs:
+      dims: 1024
+      distance_metric: cosine
+      algorithm: hnsw
+      datatype: float32
+      initial_cap: 1000
+      m: 16
+      ef_construction: 200
+      ef_runtime: 10
