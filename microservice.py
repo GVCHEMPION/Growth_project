@@ -1783,7 +1783,7 @@ class RAGProcessor:
             ans_model = Deep_Logic_Schema.model_validate_json(answer[r:l+1])
             ans = ans_model.final_answer
             logger.info(f"Answer: {ans}")
-            return ans
+            return "Предположение: " + ans
         except Exception as e:
             logger.error(f"Answer parsing error: {e}")
             return "N/A"
@@ -2166,4 +2166,5 @@ async def main():
         await processor.stop()
 
 if __name__ == "__main__":
+
     asyncio.run(main())
